@@ -8,10 +8,10 @@ import {Client as ClientSSE, ClientOptions as ClientOptionsSSE, createClient as 
 import {CoercionDocument, ComplexityDocument, DateDocument, ErrorDocument, ErrorType, JsonEncodingDocument, PathDocument, UserFragmentFragmentDoc, ViewerDocument} from '../generated/graphql.ts';
 import {cacheExchange, Client, dedupExchange, subscriptionExchange} from 'urql';
 import {isFragmentReady, useFragment} from "../generated";
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import {readFileSync} from 'fs';
+import {join} from 'path';
 
-const uri = process.env.VITE_SERVER_URL || 'http://localhost:8080/query';
+const uri = `${process.env.VITE_SERVER_URL || 'http://localhost:8080'}/query`;
 
 function test(client: ApolloClient<NormalizedCacheObject>) {
     describe('Json', () => {
@@ -80,6 +80,7 @@ function test(client: ApolloClient<NormalizedCacheObject>) {
             const res = await client.query({
                 query: CoercionDocument,
                 variables: {
+                    // @ts-ignore
                     value: {
                         enumVal: ErrorType.Custom,
                         strVal: "test",
@@ -112,6 +113,7 @@ function test(client: ApolloClient<NormalizedCacheObject>) {
             const res = await client.query({
                 query: CoercionDocument,
                 variables: {
+                    // @ts-ignore
                     value: {
                         enumVal: ErrorType.Custom,
                     }
@@ -128,6 +130,7 @@ function test(client: ApolloClient<NormalizedCacheObject>) {
                 variables: {
                     value: [{
                         scalarVal: {
+                            // @ts-ignore
                             key: 'someValue'
                         }
                     }]

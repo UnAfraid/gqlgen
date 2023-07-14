@@ -64,6 +64,8 @@ func main() {
 	srv.Use(extension.FixedComplexityLimit(1000))
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	http.Handle("/apollo", playground.ApolloSandboxHandler("GraphQL playground", "/query"))
+	http.Handle("/altair", playground.AltairHandler("GraphQL playground", "/query"))
 	http.Handle("/query", srv)
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)

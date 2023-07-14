@@ -27,3 +27,6 @@ fi
 
 echo "### running integration spec"
 npm run test
+
+echo "### running playwright spec"
+npx playwright test
