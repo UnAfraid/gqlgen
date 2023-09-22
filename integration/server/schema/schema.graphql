@@ -48,6 +48,10 @@ type Query {
     coercion(value: [ListCoercion!]): Boolean!
 }
 
+type Subscription {
+    userChanged: User!
+}
+
 enum ErrorType {
     CUSTOM
     NORMAL

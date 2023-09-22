@@ -10,6 +10,7 @@ resolver:
   type: Resolver
 
 struct_tag: json
+subscription_result_wrap: true
 
 autobind:
   - "github.com/99designs/gqlgen/integration/server/testomitempty"

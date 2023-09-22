@@ -10,10 +10,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/99designs/gqlgen/internal/code"
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 	"gopkg.in/yaml.v3"
+
+	"github.com/99designs/gqlgen/internal/code"
 )
 
 type Config struct {
@@ -38,6 +39,7 @@ type Config struct {
 	ReturnPointersInUmarshalInput bool                       `yaml:"return_pointers_in_unmarshalinput,omitempty"`
 	ResolversAlwaysReturnPointers bool                       `yaml:"resolvers_always_return_pointers,omitempty"`
 	NullableInputOmittable        bool                       `yaml:"nullable_input_omittable,omitempty"`
+	SubscriptionResultWrap        bool                       `yaml:"subscription_result_wrap,omitempty"`
 	EnableModelJsonOmitemptyTag   *bool                      `yaml:"enable_model_json_omitempty_tag,omitempty"`
 	SkipValidation                bool                       `yaml:"skip_validation,omitempty"`
 	SkipModTidy                   bool                       `yaml:"skip_mod_tidy,omitempty"`
@@ -63,6 +65,7 @@ func DefaultConfig() *Config {
 		ReturnPointersInUmarshalInput: false,
 		ResolversAlwaysReturnPointers: true,
 		NullableInputOmittable:        false,
+		SubscriptionResultWrap:        false,
 	}
 }
 

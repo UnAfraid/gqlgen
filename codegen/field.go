@@ -10,29 +10,31 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/99designs/gqlgen/codegen/config"
-	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/vektah/gqlparser/v2/ast"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/99designs/gqlgen/codegen/config"
+	"github.com/99designs/gqlgen/codegen/templates"
 )
 
 type Field struct {
 	*ast.FieldDefinition
 
-	TypeReference    *config.TypeReference
-	GoFieldType      GoFieldType      // The field type in go, if any
-	GoReceiverName   string           // The name of method & var receiver in go, if any
-	GoFieldName      string           // The name of the method or var in go, if any
-	IsResolver       bool             // Does this field need a resolver
-	Args             []*FieldArgument // A list of arguments to be passed to this field
-	MethodHasContext bool             // If this is bound to a go method, does the method also take a context
-	NoErr            bool             // If this is bound to a go method, does that method have an error as the second argument
-	VOkFunc          bool             // If this is bound to a go method, is it of shape (interface{}, bool)
-	Object           *Object          // A link back to the parent object
-	Default          interface{}      // The default value
-	Stream           bool             // does this field return a channel?
-	Directives       []*Directive
+	TypeReference          *config.TypeReference
+	GoFieldType            GoFieldType      // The field type in go, if any
+	GoReceiverName         string           // The name of method & var receiver in go, if any
+	GoFieldName            string           // The name of the method or var in go, if any
+	IsResolver             bool             // Does this field need a resolver
+	Args                   []*FieldArgument // A list of arguments to be passed to this field
+	MethodHasContext       bool             // If this is bound to a go method, does the method also take a context
+	NoErr                  bool             // If this is bound to a go method, does that method have an error as the second argument
+	VOkFunc                bool             // If this is bound to a go method, is it of shape (interface{}, bool)
+	Object                 *Object          // A link back to the parent object
+	Default                interface{}      // The default value
+	Stream                 bool             // does this field return a channel?
+	SubscriptionResultWrap bool
+	Directives             []*Directive
 }
 
 func (b *builder) buildField(obj *Object, field *ast.FieldDefinition) (*Field, error) {
@@ -42,12 +44,13 @@ func (b *builder) buildField(obj *Object, field *ast.FieldDefinition) (*Field, e
 	}
 
 	f := Field{
-		FieldDefinition: field,
-		Object:          obj,
-		Directives:      dirs,
-		GoFieldName:     templates.ToGo(field.Name),
-		GoFieldType:     GoFieldVariable,
-		GoReceiverName:  "obj",
+		FieldDefinition:        field,
+		Object:                 obj,
+		Directives:             dirs,
+		GoFieldName:            templates.ToGo(field.Name),
+		GoFieldType:            GoFieldVariable,
+		GoReceiverName:         "obj",
+		SubscriptionResultWrap: b.Config.SubscriptionResultWrap,
 	}
 
 	if field.DefaultValue != nil {
@@ -76,6 +79,24 @@ func (b *builder) buildField(obj *Object, field *ast.FieldDefinition) (*Field, e
 
 	if f.IsResolver && b.Config.ResolversAlwaysReturnPointers && !f.TypeReference.IsPtr() && f.TypeReference.IsStruct() {
 		f.TypeReference = b.Binder.PointerTo(f.TypeReference)
+	}
+
+	if f.Stream && b.Config.SubscriptionResultWrap {
+		subscriptionResultType, err := b.Binder.FindType("github.com/99designs/gqlgen/graphql", "SubscriptionResult")
+		if err != nil {
+			panic(err)
+		}
+
+		wrappedSubscriptionResultType, err := b.Binder.InstantiateType(subscriptionResultType, []types.Type{f.TypeReference.GO})
+		if err != nil {
+			panic(err)
+		}
+
+		wrappedSubscriptionResultTypeReference, err := b.Binder.TypeReference(f.Type, wrappedSubscriptionResultType)
+		if err != nil {
+			panic(err)
+		}
+		f.TypeReference = wrappedSubscriptionResultTypeReference
 	}
 
 	return &f, nil
@@ -536,6 +557,9 @@ func (f *Field) ShortResolverSignature(ft *goast.FuncType) string {
 
 	result := templates.CurrentImports.LookupType(f.TypeReference.GO)
 	if f.Object.Stream {
+		if f.SubscriptionResultWrap {
+			result = "graphql.SubscriptionResult[" + result + "]"
+		}
 		result = "<-chan " + result
 	}
 	// Named return.

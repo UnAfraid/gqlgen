@@ -40,10 +40,22 @@ func (ec *executionContext) _{{$object.Name}}_{{$field.Name}}(ctx context.Contex
 	{{- if $object.Stream }}
 		return func(ctx context.Context) graphql.Marshaler {
 			select {
-			case res, ok := <-resTmp.(<-chan {{$field.TypeReference.GO | ref}}):
+			case {{if $field.SubscriptionResultWrap}}subRes{{else}}res{{end}}, ok := <-resTmp.(<-chan {{if $field.SubscriptionResultWrap}}graphql.SubscriptionResult[{{end}}{{$field.TypeReference.GO | ref}}{{if $field.SubscriptionResultWrap}}]{{end}}):
 				if !ok {
 					return nil
 				}
+				{{- if $field.SubscriptionResultWrap }}
+				res, err := subRes.Result()
+				if err != nil {
+					transport.AddSubscriptionError(ctx, &gqlerror.Error{
+						Err:        err,
+						Message:    err.Error(),
+						Path:       graphql.GetPath(ctx),
+						Extensions: graphql.GetExtensions(ctx),
+					})
+					return nil
+				}
+				{{- end }}
 				return graphql.WriterFunc(func(w io.Writer) {
 					w.Write([]byte{'{'})
 					graphql.MarshalString(field.Alias).MarshalGQL(w)
@@ -116,10 +128,10 @@ func (ec *executionContext) {{ $field.FieldContextFunc }}(ctx context.Context, f
 		if tmp == nil {
 		    return nil, nil
 		}
-		if data, ok := tmp.({{if .Stream}}<-chan {{end}}{{ .TypeReference.GO | ref }}) ; ok {
+		if data, ok := tmp.({{if .Stream}}<-chan {{if .SubscriptionResultWrap}}graphql.SubscriptionResult[{{end}}{{end}}{{ .TypeReference.GO | ref }}{{if and (.Stream) (.SubscriptionResultWrap)}}]{{end}}) ; ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be {{if .Stream}}<-chan {{end}}{{ .TypeReference.GO }}`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be {{if .Stream}}<-chan {{if .SubscriptionResultWrap}}graphql.SubscriptionResult[{{end}}{{end}}{{ .TypeReference.GO }}{{if and (.Stream) (.SubscriptionResultWrap)}}]{{end}}`, tmp)
 	{{- else -}}
 		ctx = rctx  // use context from middleware stack in children
 		{{ template "fieldDefinition" . }}

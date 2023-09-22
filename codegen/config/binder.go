@@ -9,8 +9,9 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/99designs/gqlgen/internal/code"
 	"github.com/vektah/gqlparser/v2/ast"
+
+	"github.com/99designs/gqlgen/internal/code"
 )
 
 var ErrTypeNotFound = errors.New("unable to find type")
@@ -192,17 +193,18 @@ func (b *Binder) PointerTo(ref *TypeReference) *TypeReference {
 
 // TypeReference is used by args and field types. The Definition can refer to both input and output types.
 type TypeReference struct {
-	Definition              *ast.Definition
-	GQL                     *ast.Type
-	GO                      types.Type  // Type of the field being bound. Could be a pointer or a value type of Target.
-	Target                  types.Type  // The actual type that we know how to bind to. May require pointer juggling when traversing to fields.
-	CastType                types.Type  // Before calling marshalling functions cast from/to this base type
-	Marshaler               *types.Func // When using external marshalling functions this will point to the Marshal function
-	Unmarshaler             *types.Func // When using external marshalling functions this will point to the Unmarshal function
-	IsMarshaler             bool        // Does the type implement graphql.Marshaler and graphql.Unmarshaler
-	IsOmittable             bool        // Is the type wrapped with Omittable
-	IsContext               bool        // Is the Marshaler/Unmarshaller the context version; applies to either the method or interface variety.
-	PointersInUmarshalInput bool        // Inverse values and pointers in return.
+	Definition                  *ast.Definition
+	GQL                         *ast.Type
+	GO                          types.Type  // Type of the field being bound. Could be a pointer or a value type of Target.
+	Target                      types.Type  // The actual type that we know how to bind to. May require pointer juggling when traversing to fields.
+	CastType                    types.Type  // Before calling marshalling functions cast from/to this base type
+	Marshaler                   *types.Func // When using external marshalling functions this will point to the Marshal function
+	Unmarshaler                 *types.Func // When using external marshalling functions this will point to the Unmarshal function
+	IsMarshaler                 bool        // Does the type implement graphql.Marshaler and graphql.Unmarshaler
+	IsOmittable                 bool        // Is the type wrapped with Omittable
+	IsSubscriptionResultWrapped bool        // Is the type wrapped with SubscriptionResult
+	IsContext                   bool        // Is the Marshaler/Unmarshaller the context version; applies to either the method or interface variety.
+	PointersInUmarshalInput     bool        // Inverse values and pointers in return.
 }
 
 func (ref *TypeReference) Elem() *TypeReference {
@@ -350,6 +352,20 @@ func unwrapOmittable(t types.Type) (types.Type, bool) {
 	return named.TypeArgs().At(0), true
 }
 
+func unwrapSubscriptionResult(t types.Type) (types.Type, bool) {
+	if t == nil {
+		return t, false
+	}
+	named, ok := t.(*types.Named)
+	if !ok {
+		return t, false
+	}
+	if named.Origin().String() != "github.com/99designs/gqlgen/graphql.SubscriptionResult[T any]" {
+		return t, false
+	}
+	return named.TypeArgs().At(0), true
+}
+
 func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret *TypeReference, err error) {
 	if innerType, ok := unwrapOmittable(bindTarget); ok {
 		if schemaType.NonNull {
@@ -362,6 +378,15 @@ func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret
 		}
 
 		ref.IsOmittable = true
+		return ref, err
+	}
+	if innerType, ok := unwrapSubscriptionResult(bindTarget); ok {
+		ref, err := b.TypeReference(schemaType, innerType)
+		if err != nil {
+			return nil, err
+		}
+
+		ref.IsSubscriptionResultWrapped = true
 		return ref, err
 	}
 
